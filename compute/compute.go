@@ -17,6 +17,8 @@ var computeHeader = []string{
 	"Name",
 	"Status",
 	"Machine Type",
+	"CPU",
+	"Memory (MB)",
 	"IP Address",
 	"Disks (GB)",
 	"Creation Time",
@@ -35,6 +37,9 @@ func getDisksSizes(instance *compute.Instance) string {
 		disksSizes = append(disksSizes, fmt.Sprintf("%dGB", disk.DiskSizeGb))
 	}
 	return strings.Join(disksSizes, ", ")
+}
+func removeUrlPrefix(url string) string {
+	return strings.Split(url, "/")[len(strings.Split(url, "/"))-1]
 }
 func GetComputeInventory(ctx context.Context, projectsId []*project.Project, zones config.Zones, log *logger.Logger) ([][]string, error) {
 	log.Infof("Getting compute inventory")
@@ -60,13 +65,19 @@ func GetComputeInventory(ctx context.Context, projectsId []*project.Project, zon
 					log.Errorf("Failed to get compute inventory for project %s and zone %s, error: %s", projectId.Name, zone, err.Error())
 					continue
 				}
+
+				machineTypes := FetchMachineTypes(ctx, projectId.ID, zone, log)
+
 				for _, instance := range instances.Items {
+					mt := removeUrlPrefix(instance.MachineType)
 					localInventory = append(localInventory, []string{
 						projectId.Name,
 						zone,
 						instance.Name,
 						instance.Status,
-						instance.MachineType,
+						mt,
+						machineTypes.GetCPU(mt),
+						machineTypes.GetMemory(mt),
 						getNetworkInterfaces(instance),
 						getDisksSizes(instance),
 						instance.CreationTimestamp,
